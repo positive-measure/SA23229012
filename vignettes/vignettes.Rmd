@@ -1,0 +1,205 @@
+---
+title: "Heteroskedasticity AFT model"
+author: "Wang Qiyu"
+date: "2023-11-27"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Heteroskedasticity AFT model}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+```{r setup,include=FALSE}
+library(SA23229012)
+```
+## Heteroscedastic AFT model
+
+### Introduction to survival analysis and AFT models
+
+The Accelerated Failure Time (AFT) model is a survival analysis model used to study the time until an event occurs. Unlike the Cox Proportional Hazards model, the AFT model directly models the survival time instead of hazard ratios.
+
+Here are the key concepts of the AFT model:
+
+1. **Survival Time Distribution Function**:
+
+   The AFT model assumes that the survival time \(T\) follows a specific probability distribution, often denoted by \(F(t)\). Common distributions include the exponential distribution, Weibull distribution, etc. The survival time distribution function describes the probability of the event occurring at different time points.
+
+   \[ F(t) = P(T \leq t) \]
+
+2. **Scale/Location Parameter (Acceleration Factor)**:
+
+   The AFT model introduces a scale parameter, typically denoted as \(s\). This factor affects the scale or magnitude of survival times, essentially representing a time scale. If \(s > 1\), it implies longer survival times compared to a baseline distribution; if \(s < 1\), it implies shorter times.
+
+   \[ T_i = s \cdot T_{0i} \]
+
+   Here, \(T_i\) is the observed survival time for individual \(i\), and \(T_{0i}\) is the survival time for the same individual under the baseline distribution.
+
+3. **Regression Parameters**:
+
+   Similar to the Cox Proportional Hazards model, the AFT model can include regression parameters, denoted as \(\beta\), to examine the impact of covariates on survival time. The regression parameters are typically part of the equation:
+
+   \[ \log(T_i) = \beta_0 + \beta_1 X_{1i} + \beta_2 X_{2i} + \ldots + \beta_p X_{pi} \]
+
+   Here, \(X_{1i}, X_{2i}, \ldots, X_{pi}\) are covariates associated with individual \(i\).
+
+4. **Model Form**:
+
+   The general form of the AFT model can be expressed as:
+
+   \[ \log(T_i) = \beta_0 + \beta_1 X_{1i} + \beta_2 X_{2i} + \ldots + \beta_p X_{pi} + \epsilon_i \]
+
+   Here, \(\epsilon_i\) is a random error term, often assumed to follow a specific distribution (e.g., normal distribution).
+
+The AFT model is advantageous as it directly models survival times and can handle various distributions. Parameter estimation is typically done using methods such as maximum likelihood estimation. AFT models find applications in medical research, biostatistics, reliability engineering, and other fields.
+
+
+### Heteroscedastic AFT model
+
+In the framework of quantile regression we can make few restriction  on the type of distribution of the error term:
+	
+$$
+		\ln T=\beta X+W.
+$$
+The error distribution of W is controlled by survival time:
+
+$$
+P(W<w|X)=F(\mu_i,w)=F(\beta X,w).
+$$
+Take the $\tau$th quantile directly，we obtain:
+	
+$$
+(\ln T)_\tau=\beta X+W_\tau(\beta X).
+$$
+
+
+the estimating function is:
+		
+$$
+			S_n(W_\tau,\beta)=\frac{1}{n} (\sum_{i=1} Z_i (N_i(\exp \{\beta X+W_\tau(\beta X)\}) 
+			-\int_0^\tau I\left[X_i \geq \exp \left\{\beta X+W_\tau(\beta X)\right\}\right] d H(u))=0.
+$$
+
+
+Given an initial $ \beta_0 $, basis funciton $ \pi(x) $ ,a series of split points $ \tau_L<\tau_0<...<\tau_R $, then for each $ \tau_j $[1]:
+
+$$
+\sum_{i=1} \pi(\beta X_i) ( \;N_i(\exp \{\beta_0 X_i+\pi^T(\beta_0 X_i)\gamma_\tau\}) -\int_0^\tau I\left[Y_i \geq \exp \left\{\beta_0 X+\pi^T(\beta_0 X)\gamma_\tau\right\}\right] d H(u) \; )=0 
+$$
+		
+	
+In the first step of the program, we will use the classic AFT model to output the mean prediction value, and in the second step, we will output the quantile estimate of the model. This will be a further analysis of heteroscedastic data
+
+## Run the example
+
+### 1.Generate data
+```{r}
+set.seed(100)
+N<-500
+p<-2
+data_1 <- f_gener_data(N,p,"normal")
+head(data_1)
+data_2 <- f_gener_data(N,p,"normal",heteroskedasticity=FALSE)
+```
+$x_{1} \sim N(0,1)$，$x_{2} \sim Binom(0.5)$,all covariates are normalized by default.Y represents $min(\ln T,C_i), C_i$ is the censoring time.
+
+### 2.Run classical AFT model
+
+```{r,fig.width=10, fig.height=6, out.width="80%", fig.align='center',warning=FALSE,message=FALSE,collapse=TRUE}
+library(aftgee)
+library(dplyr)
+
+fit1 <- aftgee(Surv(Y, status) ~ ., data = data_1)
+beta_0 <-matrix(fit1$coefficients[,1])
+print(computeCindex(as.numeric(beta_0), as.matrix(data_1)))
+
+# draw pictures,demonstrate heterogeneity in variance 
+data_main<-data_1
+data_x1 <- data_main%>%select(-c("Y","status"))
+data_x2_plot<- as.matrix(cbind(data.frame(rep(1,dim(data_main)[1])),data_x1))
+mu <- data_x2_plot %*% beta_0
+lnY_plot <- as.matrix(log(data_main["Y"]))
+status<-data_main["status"]
+plot(mu,lnY_plot,ann = F, xlab = expression("Mu (μ)"), ylab = expression("Log(Y)"))
+points(mu[status == 0], lnY_plot[status == 0], col = "blue", pch = 16)  
+points(mu[status == 1], lnY_plot[status == 1], col = "red", pch = 16)  
+abline(a = 0, b = 1, col = "red")
+mtext("The line represents the predicted mean, red=uncensoed, blue=censored", side = 1, line = 2, col = "black", cex = 1.2)
+```
+
+### 3.Get quantile information
+
+From the above figure, we know that in the case of heteroskedasticity, the coefficients estimated by the standard AFT model do not completely fall near the mean of the data. In this case, we can obtain the quantile estimate through the spline method.
+
+```{r,include=FALSE}
+library(splines)
+f_get_basisnumber <- function(data,beta)
+{
+  data_x1 <- data%>%select(-c("Y","status"))
+  data_x2<- as.matrix(cbind(data.frame(rep(1,dim(data)[1])),data_x1))
+  mu <- data_x2 %*% beta
+  seq1 <-quantile(mu,c(0.5))
+  s1<-as.matrix(bs(mu,knots=seq1,degree=2,intercept=TRUE)[,])
+  beta_dim <- dim(s1)[2]
+  return(beta_dim)
+}
+basis_number<-f_get_basisnumber(data_1,beta_0)
+```
+
+
+```{r}
+library(aftgee)
+library(dplyr)
+
+tau_0<-0.05
+tau_list <- matrix(sort(seq(0,1-tau_0,tau_0), decreasing = TRUE),nrow = 1)
+tau_pre_out<-matrix(c(0),nrow=1)
+#basis_number means number of basis function
+beta_pre_out<-matrix(c(rep(-10,basis_number)),nrow=basis_number)
+#initialize
+for (j in 1:(length(tau_list)-1)) 
+    {
+    beta_up<-f_update_basiscoef(tau=tau_list[1,length(tau_list)-j],
+    data=data_1,beta=beta_0,
+    tau_pre=tau_pre_out,beta_pre=beta_pre_out)
+    
+    beta_pre_out <- cbind(beta_up,beta_pre_out)
+    
+    tau_pre_out <- matrix(tau_list[1,(length(tau_list)-j):length(tau_list)],nrow=1)
+    }
+```
+
+
+```{r,include=FALSE}
+print(beta_pre_out)
+```
+The beta_pre_out output here stores the coefficients before the basis function of each quantile.Each column represents a quantile,We will show it intuitively latter:
+
+```{r,fig.width=10, fig.height=6, out.width="80%", fig.align='center',warning=FALSE,message=FALSE}
+library(ggplot2)
+data_x1 <- data_1%>%select(-c("Y","status"))
+data_x2_plot<- as.matrix(cbind(data.frame(rep(1,dim(data_1)[1])),data_x1))
+mu <- data_x2_plot %*% beta_0
+seq1<- quantile(mu,c(0.5))
+s1<-as.matrix(bs(mu,knots=seq1,degree=2,intercept=TRUE)[,])
+mu_matrix <- cbind(mu,mu)
+data_plot<- cbind(data.frame(mu),data.frame(mu_matrix+s1 %*% beta_pre_out[,c(5,15)]))
+data_plot$lnY <- log(data_1$Y)
+data_plot$status <- data_1$status
+
+scatter_plot <- ggplot(data_plot, aes(x = mu, y = lnY, color =as.character(status))) +
+    geom_point() +
+    labs( x = expression(beta * x) , y = "ln T",color = "Status") +
+    scale_color_manual(values = c("0" = "blue", "1" = "red"))  # 
+  curve_plot <- scatter_plot +
+    geom_smooth(aes(y = X1), color = "red") +
+    geom_smooth(aes(y = X2), color = "green") +
+    labs(title = "Scatter Plot with Quartiles Curves,Upper quartile and lower quartile",x = expression(beta * x), y = "Y")
+
+print(curve_plot)
+```
+
+The changes in quartiles show that this method indeed identifies the heterogeneity of variance, which also provides an analysis basis for the subsequent heterogeneity discovery method.
+
+
+Reference:
+
+[1]Peng L, Huang Y. Survival analysis with quantile regression models[J]. Journal of the American Statistical Association, 2008, 103(482): 637-649.

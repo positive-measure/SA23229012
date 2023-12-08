@@ -1,0 +1,15 @@
+Package: SA23229012
+Type: Package
+Title: SA23229012
+Version: 1.0
+Date: 2023-12-03
+Author: wqy
+Maintainer: wqy <wang_qy@mail.ustc.edu.cn>
+Description: This is a final homework
+License: GPL (>= 2)
+Imports: Rcpp (>= 1.0.11),VGAM,dplyr,splines,aftgee,quantreg,survival,ggplot2,bootstrap,boot,twosamples,coda,microbenchmark,DAAG
+LinkingTo: Rcpp
+RoxygenNote: 7.2.3
+Encoding: UTF-8
+Suggests: knitr, rmarkdown
+VignetteBuilder: knitr
